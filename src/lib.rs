@@ -1,13 +1,11 @@
 use pyo3::prelude::*;
-
+pub mod model;
 /// A Python module implemented in Rust.
 #[pymodule]
-mod coeirocore_rs {
-    use pyo3::prelude::*;
+fn coeirocore_rs (py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    let model = PyModule::new(py, "model")?;
+    crate::model::model(py, &model)?;
+    m.add_submodule(&model)?;
 
-    /// Formats the sum of two numbers as string.
-    #[pyfunction]
-    fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-        Ok((a + b).to_string())
-    }
+    Ok(())
 }
