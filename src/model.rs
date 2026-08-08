@@ -39,7 +39,7 @@ pub struct AccentPhrase {
     pub is_interrogative: bool,
 }
 
-#[pyclass(skip_from_py_object)]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct AudioQuery {
     #[pyo3(get, set, name = "accentPhrases")]
