@@ -9,6 +9,7 @@ name = "coeirocore_rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+espnet-burn = { git = "https://github.com/hydriod/espnet-burn", version = "0.2" }
 glob = "0.3.4"
 numpy = "0.29.0"
 pyo3 = "0.29.0"
