@@ -128,6 +128,22 @@ impl MetaManager {
     }
 }
 
+impl MetaManager {
+    /// 最初の話者の最初のスタイルIDを返す（speaker_infosが空の場合は0）。
+    pub fn first_style_id(&self) -> i32 {
+        self.speaker_infos
+            .first()
+            .and_then(|info| info.styles.first())
+            .map(|style| style.style_id)
+            .unwrap_or(0)
+    }
+
+    /// 指定スタイルIDのモデルパスを返す（id_model_map相当）。
+    pub fn get_model_path(&self, style_id: i32) -> Option<ModelPath> {
+        self.id_model_map.get(&style_id).cloned()
+    }
+}
+
 fn meta_to_speaker_info(meta: &Meta) -> SpeakerInfo {
     SpeakerInfo {
         speaker_name: meta.speaker_name.clone(),

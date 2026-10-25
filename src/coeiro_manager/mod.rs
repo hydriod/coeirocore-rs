@@ -9,9 +9,11 @@ pub use crate::coeiro_manager::meta_manager::{MetaManager, ModelPath};
 use pyo3::prelude::*;
 
 #[pymodule]
-pub fn coeiro_manager(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn coeiro_manager(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ModelPath>()?;
     m.add_class::<MetaManager>()?;
+    m.add_class::<EspnetModel>()?;
+    m.add_class::<AudioManager>()?;
 
     Ok(())
 }
