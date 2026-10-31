@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fs::File, path::Path};
+use std::{
+    collections::HashMap,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 use glob::glob;
 use pyo3::{
@@ -41,42 +45,45 @@ impl MetaManager {
         let mut uuid_list = Vec::<String>::new();
         let mut speaker_infos = Vec::<SpeakerInfo>::new();
         let mut id_model_map = HashMap::<i32, ModelPath>::new();
-        for entry in glob("./speaker_info/**/").unwrap() {
-            if let Ok(path) = entry {
-                match File::open(path.join("metas.json")) {
-                    Ok(file) => {
-                        match serde_json::from_reader::<File, Meta>(file) {
-                            Ok(meta) => {
-                                // 重複確認
-                                if uuid_list.contains(&meta.speaker_uuid) {
-                                    eprintln!(
-                                        "SpeakerUuid({})の重複があります。",
-                                        meta.speaker_uuid
-                                    );
-                                    continue;
-                                }
-                                uuid_list.push(meta.speaker_uuid.clone());
+        // Python元実装と同様、globは1階層のみ・ソート済みで処理する
+        let mut speaker_paths: Vec<PathBuf> =
+            glob("./speaker_info/*/").unwrap().flatten().collect();
+        speaker_paths.sort();
+        for path in speaker_paths {
+            match File::open(path.join("metas.json")) {
+                Ok(file) => {
+                    match serde_json::from_reader::<File, Meta>(file) {
+                        Ok(meta) => {
+                            // 重複確認
+                            if uuid_list.contains(&meta.speaker_uuid) {
+                                eprintln!("SpeakerUuid({})の重複があります。", meta.speaker_uuid);
+                                continue;
+                            }
+                            uuid_list.push(meta.speaker_uuid.clone());
 
-                                speaker_infos.push(meta_to_speaker_info(&meta));
-                                id_model_map = append_id_model_map(&meta, id_model_map, &path);
-                            }
-                            Err(e) => {
-                                // スキーマに従わない場合はエラーを出力してスキップ
-                                eprintln!("Failed to parse metas.json: {}", e);
-                            }
+                            speaker_infos.push(meta_to_speaker_info(&meta));
+                            id_model_map = append_id_model_map(&meta, id_model_map, &path);
+                        }
+                        Err(e) => {
+                            // スキーマに従わない場合はエラーを出力してスキップ
+                            eprintln!("Failed to parse metas.json: {}", e);
                         }
                     }
-                    Err(e) => {
-                        return Err(PyOSError::new_err(format!(
-                            "Failed to open metas.json: {}",
-                            e
-                        )));
-                    }
+                }
+                Err(e) => {
+                    return Err(PyOSError::new_err(format!(
+                        "Failed to open metas.json: {}",
+                        e
+                    )));
                 }
             }
         }
         Ok(MetaManager {
-            speaker_infos,
+            speaker_infos: {
+                let mut infos = speaker_infos;
+                sort_speaker_infos(&mut infos);
+                infos
+            },
             id_model_map,
         })
     }
@@ -90,12 +97,9 @@ impl MetaManager {
             let mut styles_list = Vec::new();
             for style in &speaker_info.styles {
                 let mut style_dict = HashMap::new();
+                style_dict.insert("id".to_string(), PyInt::new(py, style.style_id).into_any());
                 style_dict.insert(
-                    "style_id".to_string(),
-                    PyInt::new(py, style.style_id).into_any(),
-                );
-                style_dict.insert(
-                    "style_name".to_string(),
+                    "name".to_string(),
                     PyString::new(py, &style.style_name).into_any(),
                 );
                 styles_list.push(style_dict);
@@ -103,7 +107,7 @@ impl MetaManager {
 
             let mut speaker_dict = HashMap::new();
             speaker_dict.insert(
-                "speaker_name".to_string(),
+                "name".to_string(),
                 PyString::new(py, &speaker_info.speaker_name).into_any(),
             );
             speaker_dict.insert(
@@ -126,6 +130,11 @@ impl MetaManager {
     pub fn default_style_id(&self) -> i32 {
         0
     }
+}
+
+/// Python元実装と同様、speaker_infosを最初のスタイルIDでソートする
+fn sort_speaker_infos(speaker_infos: &mut [SpeakerInfo]) {
+    speaker_infos.sort_by_key(|info| info.styles.first().map(|s| s.style_id).unwrap_or(i32::MAX));
 }
 
 impl MetaManager {
@@ -165,14 +174,8 @@ fn append_id_model_map(
 
         let model_folder_path = speaker_path.join("model").join(style.style_id.to_string());
         let model_paths = glob(model_folder_path.join("*.pth").to_str().unwrap()).unwrap();
-        let mut model_path = None;
-        for entry in model_paths {
-            if let Ok(valid_model_path) = entry {
-                model_path = valid_model_path.into();
-                break;
-            }
-        }
-        match model_path {
+
+        match model_paths.flatten().next() {
             Some(model_path) => {
                 let model_path = ModelPath {
                     model_path: String::from(model_path.to_str().unwrap()),

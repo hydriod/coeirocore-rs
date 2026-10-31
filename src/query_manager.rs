@@ -26,23 +26,28 @@ fn query2tokens_prosody(query: &Bound<'_, AudioQuery>) -> PyResult<Vec<String>> 
             if (accent_phrase.accent == j as i32 + 1) && (j + 1 != accent_phrase.moras.len()) {
                 tokens.push("]".to_string());
             }
-            if (accent_phrase.accent - 1 >= j as i32 + 1) && (up_token_flag == false) {
+            if (accent_phrase.accent > j as i32 + 1) && (!up_token_flag) {
                 tokens.push("[".to_string());
                 up_token_flag = true;
             }
-            if i + 1 != query.accent_phrases.len() {
-                if accent_phrase.pause_mora.is_some() {
-                    tokens.push("_".to_string())
-                } else {
-                    tokens.push("#".to_string())
-                }
+        }
+        // pause_mora(無音区間)はPython元実装と同様にアクセントフレームごとに1つ追加する
+        if i + 1 != query.accent_phrases.len() {
+            if accent_phrase.pause_mora.is_some() {
+                tokens.push("_".to_string())
+            } else {
+                tokens.push("#".to_string())
             }
         }
     }
 
-    if (query.accent_phrases.len() <= 1) && (query.accent_phrases.last().unwrap().is_interrogative)
-    {
-        tokens.push("?".to_string())
+    // Python元実装と同様、空のaccent_phrasesは IndexError を除いて "$" を返す
+    if let Some(last) = query.accent_phrases.last() {
+        if last.is_interrogative {
+            tokens.push("?".to_string())
+        } else {
+            tokens.push("$".to_string())
+        }
     } else {
         tokens.push("$".to_string())
     }

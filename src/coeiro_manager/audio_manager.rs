@@ -4,10 +4,10 @@ use pyo3::{
     exceptions::{PyKeyError, PyRuntimeError},
     prelude::*,
 };
-use rubato::{FixedSync, Fft, Resampler};
-use rubato::audioadapter_buffers::owned::InterleavedOwned;
 use rsworld::{cheaptrick, d4c, harvest, stonemask, synthesis as world_synthesis};
 use rsworld_sys::{CheapTrickOption, D4COption, HarvestOption};
+use rubato::audioadapter_buffers::owned::InterleavedOwned;
+use rubato::{Fft, FixedSync, Resampler};
 
 use crate::coeiro_manager::{
     espnet_model::EspnetModel,
@@ -53,6 +53,7 @@ impl AudioManager {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         text,
         style_id,
@@ -139,7 +140,12 @@ impl AudioManager {
     }
 
     #[staticmethod]
-    pub fn sil(wav: Vec<f32>, fs: i32, pre_phoneme_length: f64, post_phoneme_length: f64) -> Vec<f32> {
+    pub fn sil(
+        wav: Vec<f32>,
+        fs: i32,
+        pre_phoneme_length: f64,
+        post_phoneme_length: f64,
+    ) -> Vec<f32> {
         sil(wav, fs, pre_phoneme_length, post_phoneme_length)
     }
 
@@ -172,11 +178,7 @@ fn trim(wav: Vec<f32>) -> Vec<f32> {
     let mut i = 0;
     while i < wav.len() {
         let end = (i + FRAME_LENGTH).min(wav.len());
-        let mean_square = wav[i..end]
-            .iter()
-            .map(|&x| x * x)
-            .sum::<f32>()
-            / (end - i) as f32;
+        let mean_square = wav[i..end].iter().map(|&x| x * x).sum::<f32>() / (end - i) as f32;
         frame_dbs.push(10.0 * (mean_square.max(f32::EPSILON) as f64).log10());
         i += HOP_LENGTH;
     }
@@ -221,12 +223,7 @@ fn pitch_intonation(wav: Vec<f32>, fs: i32, pitch_scale: f64, intonation_scale: 
     // intonation
     if intonation_scale != 1.0 {
         let m = f0.iter().sum::<f64>() / f0.len() as f64;
-        let s = (f0
-            .iter()
-            .map(|f| (f - m) * (f - m))
-            .sum::<f64>()
-            / f0.len() as f64)
-            .sqrt();
+        let s = (f0.iter().map(|f| (f - m) * (f - m)).sum::<f64>() / f0.len() as f64).sqrt();
         f0.iter_mut()
             .for_each(|f| *f = ((*f - m) / s) * (s * intonation_scale) + m);
     }
@@ -269,7 +266,9 @@ fn resampling(wav: Vec<f32>, fs: i32, output_sampling_rate: i32) -> PyResult<Vec
 
     let input_len = wav.len();
     let buffer_in = InterleavedOwned::new_from(wav, 1, input_len).map_err(|e| {
-        PyRuntimeError::new_err(format!("リサンプリング入力バッファの生成に失敗しました: {e}"))
+        PyRuntimeError::new_err(format!(
+            "リサンプリング入力バッファの生成に失敗しました: {e}"
+        ))
     })?;
 
     let buffer_out = resampler
