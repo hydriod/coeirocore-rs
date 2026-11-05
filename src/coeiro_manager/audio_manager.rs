@@ -28,6 +28,7 @@ pub struct AudioManager {
 #[pymethods]
 impl AudioManager {
     #[new]
+    #[pyo3(signature = (fs = None, use_gpu = None))]
     pub fn new(fs: Option<i32>, use_gpu: Option<bool>) -> PyResult<Self> {
         let fs = fs.unwrap_or(44100);
         let use_gpu = use_gpu.unwrap_or(false);
